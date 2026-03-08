@@ -1032,12 +1032,8 @@ func (e *StrategyEngine) BuildSystemPrompt(accountEquity float64, variant string
 	riskControl := e.config.RiskControl
 	promptSections := e.config.PromptSections
 
-	// 0. Data Dictionary & Schema (ensure AI understands all fields)
-	lang := e.GetLanguage()
-	schemaPrompt := GetSchemaPrompt(lang)
-	sb.WriteString(schemaPrompt)
-	sb.WriteString("\n\n")
-	sb.WriteString("---\n\n")
+	// Note: Schema/Data Dictionary is now included in User Prompt to reduce
+	// System Prompt size and avoid repeating static content every call.
 
 	// 1. Role definition (editable)
 	if promptSections.RoleDefinition != "" {
@@ -1051,11 +1047,11 @@ func (e *StrategyEngine) BuildSystemPrompt(accountEquity float64, variant string
 	// 2. Trading mode variant
 	switch strings.ToLower(strings.TrimSpace(variant)) {
 	case "aggressive":
-		sb.WriteString("## Mode: Aggressive\n- Prioritize capturing trend breakouts, can build positions in batches when confidence ≥ 70\n- Allow higher positions, but must strictly set stop-loss and explain risk-reward ratio\n\n")
+		sb.WriteString("## Mode: Aggressive\n- Prioritize capturing trend breakouts (both long AND short), can build positions in batches when confidence ≥ 70\n- Allow higher positions, but must strictly set stop-loss and explain risk-reward ratio\n- In strong downtrends, actively look for short opportunities\n\n")
 	case "conservative":
-		sb.WriteString("## Mode: Conservative\n- Only open positions when multiple signals resonate\n- Prioritize cash preservation, must pause for multiple periods after consecutive losses\n\n")
+		sb.WriteString("## Mode: Conservative\n- Only open positions (long or short) when multiple signals resonate\n- Prioritize cash preservation, must pause for multiple periods after consecutive losses\n- Prefer longs in uptrends, shorts only with very high confidence (≥85)\n\n")
 	case "scalping":
-		sb.WriteString("## Mode: Scalping\n- Focus on short-term momentum, smaller profit targets but require quick action\n- If price doesn't move as expected within two bars, immediately reduce position or stop-loss\n\n")
+		sb.WriteString("## Mode: Scalping\n- Focus on short-term momentum in BOTH directions, smaller profit targets but require quick action\n- If price doesn't move as expected within two bars, immediately reduce position or stop-loss\n- Short sell on breakdowns just as aggressively as going long on breakouts\n\n")
 	}
 
 	// 3. Hard constraints (risk control)
@@ -1068,7 +1064,7 @@ func (e *StrategyEngine) BuildSystemPrompt(accountEquity float64, variant string
 		altcoinPosValueRatio = 1.0
 	}
 
-	sb.WriteString("# Hard Constraints (Risk Control)\n\n")
+	sb.WriteString("# 🚨 Hard Constraints (Risk Control)\n\n")
 	sb.WriteString("## CODE ENFORCED (Backend validation, cannot be bypassed):\n")
 	sb.WriteString(fmt.Sprintf("- Max Positions: %d coins simultaneously\n", riskControl.MaxPositions))
 	sb.WriteString(fmt.Sprintf("- Position Value Limit (Altcoins): max %.0f USDT (= equity %.0f × %.1fx)\n",
@@ -1092,7 +1088,7 @@ func (e *StrategyEngine) BuildSystemPrompt(accountEquity float64, variant string
 	sb.WriteString("- Low confidence (60-69): Use 30-50%% of max position value limit\n")
 	sb.WriteString(fmt.Sprintf("- Example: With equity %.0f and BTC/ETH ratio %.1fx, max is %.0f USDT\n",
 		accountEquity, btcEthPosValueRatio, accountEquity*btcEthPosValueRatio))
-	sb.WriteString("- **DO NOT** just use available_balance as position_size_usd. Use the Position Value Limits!\n\n")
+	sb.WriteString("- 🚨 **DO NOT** just use available_balance as position_size_usd. Use the Position Value Limits!\n\n")
 
 	// 4. Trading frequency (editable)
 	if promptSections.TradingFrequency != "" {
@@ -1116,8 +1112,44 @@ func (e *StrategyEngine) BuildSystemPrompt(accountEquity float64, variant string
 		sb.WriteString("# 🎯 Entry Standards (Strict)\n\n")
 		sb.WriteString("Only open positions when multiple signals resonate. You have:\n")
 		e.writeAvailableIndicators(&sb)
-		sb.WriteString(fmt.Sprintf("\nFeel free to use any effective analysis method, but **confidence ≥ %d** required to open positions; avoid low-quality behaviors such as single indicators, contradictory signals, sideways consolidation, reopening immediately after closing, etc.\n\n", riskControl.MinConfidence))
+		sb.WriteString(fmt.Sprintf("\nFeel free to use any effective analysis method, but 🚨 **confidence ≥ %d** required to open positions; avoid low-quality behaviors such as single indicators, contradictory signals, sideways consolidation, reopening immediately after closing, etc.\n\n", riskControl.MinConfidence))
 	}
+
+	// 5.5 Market Regime Detection (NEW: guide AI to classify market state first)
+	sb.WriteString("# 📊 Market Regime Detection (MUST classify BEFORE any decision)\n\n")
+	sb.WriteString("Before making any trading decision, first classify the current market regime:\n\n")
+	sb.WriteString("| Regime | Signals | Strategy |\n")
+	sb.WriteString("|--------|---------|----------|\n")
+	sb.WriteString("| TRENDING_UP | EMA20 > EMA50, RSI > 55, OI increasing + price up | Follow trend, wider TP, use trailing stop |\n")
+	sb.WriteString("| TRENDING_DOWN | EMA20 < EMA50, RSI < 45, OI increasing + price down | 📉 **Short opportunities**, use open_short, tighter SL |\n")
+	sb.WriteString("| RANGING | BOLL width narrowing, RSI 40-60, no clear EMA cross | ⚠️ WAIT — do NOT open new positions |\n")
+	sb.WriteString("| HIGH_VOLATILITY | ATR > 2x average, rapid price swings | Reduce leverage by 50%, tighter SL |\n")
+	sb.WriteString("\n🚨 **CRITICAL: In RANGING markets, the correct decision is almost always WAIT.**\n")
+	sb.WriteString("🚨 **In TRENDING_DOWN markets, actively consider open_short — do NOT default to long-only.**\n\n")
+
+	// 5.6 Short-Selling Guide (NEW: dedicated short-selling guidance)
+	sb.WriteString("# 📉 Short-Selling Guide (做空指引)\n\n")
+	sb.WriteString("You can trade in BOTH directions. Do NOT have a long-only bias.\n\n")
+	sb.WriteString("## When to Short (open_short):\n")
+	sb.WriteString("- TRENDING_DOWN regime confirmed (EMA20 < EMA50, RSI < 45)\n")
+	sb.WriteString("- Funding Rate > +0.01% (crowded longs, reversal risk)\n")
+	sb.WriteString("- OI↑ + Price↓ = strong bearish (new shorts opening, capital flowing into short positions)\n")
+	sb.WriteString("- Price rejected at resistance level + volume spike on the down candle\n")
+	sb.WriteString("- Bearish divergence: price making higher highs but RSI making lower highs\n\n")
+	sb.WriteString("## Short-Specific Risk Rules:\n")
+	sb.WriteString("- Use LOWER leverage for shorts than longs (shorts have unlimited upside risk)\n")
+	sb.WriteString("- Set TIGHTER stop-loss for shorts (recommend 2-3% vs 3-5% for longs)\n")
+	sb.WriteString("- Prefer shorter holding periods for shorts\n")
+	sb.WriteString("- ⚠️ Watch for short squeeze: OI↓ rapidly + price↑ sharply = exit short immediately\n\n")
+	sb.WriteString("## Funding Rate Interpretation:\n\n")
+	sb.WriteString("| Funding Rate | Market Sentiment | Action Signal |\n")
+	sb.WriteString("|-------------|-----------------|---------------|\n")
+	sb.WriteString("| > +0.03% | EXTREME crowded longs | 🟢 Strong short signal |\n")
+	sb.WriteString("| > +0.01% | Moderately crowded longs | Short if other signals confirm |\n")
+	sb.WriteString("| -0.01% ~ +0.01% | Neutral | No directional bias from funding |\n")
+	sb.WriteString("| < -0.01% | Crowded shorts | ❌ Avoid shorting, potential squeeze |\n")
+	sb.WriteString("| < -0.03% | EXTREME crowded shorts | 🟢 Strong long signal |\n")
+	sb.WriteString("\n")
 
 	// 6. Decision process (editable)
 	if promptSections.DecisionProcess != "" {
@@ -1125,9 +1157,10 @@ func (e *StrategyEngine) BuildSystemPrompt(accountEquity float64, variant string
 		sb.WriteString("\n\n")
 	} else {
 		sb.WriteString("# 📋 Decision Process\n\n")
-		sb.WriteString("1. Check positions → Should we take profit/stop-loss\n")
-		sb.WriteString("2. Scan candidate coins + multi-timeframe → Are there strong signals\n")
-		sb.WriteString("3. Write chain of thought first, then output structured JSON\n\n")
+		sb.WriteString("1. **Classify market regime** → TRENDING_UP / TRENDING_DOWN / RANGING / HIGH_VOLATILITY\n")
+		sb.WriteString("2. Check positions → Should we take profit/stop-loss\n")
+		sb.WriteString("3. Scan candidate coins + multi-timeframe → Are there strong signals\n")
+		sb.WriteString("4. Write chain of thought first, then output structured JSON\n\n")
 	}
 
 	// 7. Output format
@@ -1161,6 +1194,16 @@ func (e *StrategyEngine) BuildSystemPrompt(accountEquity float64, variant string
 		sb.WriteString("\n\n")
 		sb.WriteString("Note: The above personalized strategy is a supplement to the basic rules and cannot violate the basic risk control principles.\n")
 	}
+
+	// 9. Common Mistakes (NEW: critical anti-patterns)
+	sb.WriteString("\n# ❌ Common Mistakes (MUST AVOID)\n\n")
+	sb.WriteString("1. **Revenge Trading**: Do NOT open a new position immediately after a stop-loss. Check RecentOrders — if last trade was a loss, raise confidence threshold to 85+\n")
+	sb.WriteString("2. **Ignoring OI Divergence**: OI↓ + Price↑ = weak bounce (shorts covering), NOT a buy signal. OI↑ + Price↓ = strong bearish, consider open_short\n")
+	sb.WriteString("3. **Trading in Ranging Markets**: If BOLL bandwidth is narrowing and RSI is 40-60, output WAIT. Do not force trades in consolidation\n")
+	sb.WriteString("4. **Overtrading**: If you have opened >2 trades in the last hour (check RecentOrders timestamps), you MUST output WAIT\n")
+	sb.WriteString("5. **Correlated Positions**: Do NOT open the same direction on highly correlated assets (e.g. BTC+ETH+SOL all long). Maximum 2 positions in the same direction\n")
+	sb.WriteString("6. **Long-Only Bias**: Do NOT default to open_long in downtrends. If EMA20 < EMA50 and RSI < 45, you should consider open_short, not wait for a reversal\n")
+	sb.WriteString("7. **Ignoring Funding Rate for Shorts**: Before any open_short, CHECK the funding rate. If funding < -0.01%, do NOT short — shorts are already crowded and a squeeze is likely\n")
 
 	return sb.String()
 }
@@ -1241,6 +1284,12 @@ func (e *StrategyEngine) writeAvailableIndicators(sb *strings.Builder) {
 func (e *StrategyEngine) BuildUserPrompt(ctx *Context) string {
 	var sb strings.Builder
 
+	// 0. Include Schema/Data Dictionary in User Prompt (moved from System Prompt for token efficiency)
+	lang := e.GetLanguage()
+	schemaPrompt := GetSchemaPrompt(lang)
+	sb.WriteString(schemaPrompt)
+	sb.WriteString("\n---\n\n")
+
 	// System status
 	sb.WriteString(fmt.Sprintf("Time: %s | Period: #%d | Runtime: %d minutes\n\n",
 		ctx.CurrentTime, ctx.CallCount, ctx.RuntimeMinutes))
@@ -1276,12 +1325,34 @@ func (e *StrategyEngine) BuildUserPrompt(ctx *Context) string {
 				order.EntryTime, order.ExitTime, order.HoldDuration))
 		}
 		sb.WriteString("\n")
+
+		// Decision feedback loop: analyze patterns in recent orders
+		if len(ctx.RecentOrders) >= 2 {
+			wins := 0
+			losses := 0
+			for _, order := range ctx.RecentOrders {
+				if order.RealizedPnL >= 0 {
+					wins++
+				} else {
+					losses++
+				}
+			}
+			lastLoss := ctx.RecentOrders[len(ctx.RecentOrders)-1].RealizedPnL < 0
+			sb.WriteString("### Decision Pattern Analysis\n")
+			sb.WriteString(fmt.Sprintf("Recent trades: %d wins, %d losses\n", wins, losses))
+			if lastLoss {
+				sb.WriteString("⚠️ Last trade was a LOSS — raise entry standards, avoid revenge trading\n")
+			}
+			if losses >= 2 && losses > wins {
+				sb.WriteString("🚨 Consecutive losses detected — consider WAIT for better setups\n")
+			}
+			sb.WriteString("\n")
+		}
 	}
 
 	// Historical trading statistics (helps AI understand past performance)
 	if ctx.TradingStats != nil && ctx.TradingStats.TotalTrades > 0 {
-		// Get language from strategy config
-		lang := e.GetLanguage()
+		// lang already declared at top of BuildUserPrompt
 
 		// Win/Loss ratio
 		var winLossRatio float64

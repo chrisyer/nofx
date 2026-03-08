@@ -11,7 +11,8 @@ import (
 // 构建完整的AI提示词，包括系统提示词和用户提示词
 // ============================================================================
 
-// PromptBuilder 提示词构建器
+// Deprecated: PromptBuilder 旧版提示词构建器，请使用 StrategyEngine.BuildSystemPrompt/BuildUserPrompt
+// PromptBuilder is kept for backward compatibility only.
 type PromptBuilder struct {
 	lang Language
 }
@@ -67,8 +68,16 @@ func (pb *PromptBuilder) buildSystemPromptZH() string {
 ### 顺势交易
 - 只在多个时间框架趋势一致时进场
 - 结合持仓量(OI)变化判断资金流向真实性
-- OI增加+价格上涨 = 强多头趋势
-- OI减少+价格上涨 = 空头平仓（可能反转）
+- OI增加+价格上涨 = 强多头趋势，考虑做多(open_long)
+- OI增加+价格下跌 = 强空头趋势，考虑做空(open_short)
+- OI减少+价格上涨 = 空头平仓（可能反转，谨慎做多）
+
+### 做空原则
+- 做空使用较低杠杆（做空有无限上涨风险）
+- 做空设置更紧的止损（2-3% vs 做多3-5%）
+- 资金费率>​+0.01% 时，做多拥挤，是做空信号
+- 资金费率<-0.01% 时，做空拥挤，避免做空
+- 注意轧空风险：OI快速减少+价格快速上涨 = 立即平空仓
 
 ### 分批操作
 - 分批建仓：第一次开仓不超过目标仓位的50%
@@ -83,7 +92,7 @@ func (pb *PromptBuilder) buildSystemPromptZH() string {
 [
   {
     "symbol": "BTCUSDT",
-    "action": "HOLD|PARTIAL_CLOSE|FULL_CLOSE|ADD_POSITION|OPEN_NEW|WAIT",
+    "action": "open_long|open_short|close_long|close_short|hold|wait",
     "leverage": 3,
     "position_size_usd": 1000,
     "stop_loss": 42000,
@@ -98,12 +107,12 @@ func (pb *PromptBuilder) buildSystemPromptZH() string {
 
 - **symbol**: 交易对（必需）
 - **action**: 动作类型（必需）
-  - HOLD: 持有当前仓位
-  - PARTIAL_CLOSE: 部分平仓
-  - FULL_CLOSE: 全部平仓
-  - ADD_POSITION: 在现有仓位上加仓
-  - OPEN_NEW: 开设新仓位
-  - WAIT: 等待，不采取任何行动
+  - open_long: 做多开仓
+  - open_short: 做空开仓
+  - close_long: 平多仓
+  - close_short: 平空仓
+  - hold: 持有当前仓位
+  - wait: 等待，不采取任何行动
 - **leverage**: 杠杆倍数（开新仓时必需）
 - **position_size_usd**: 仓位大小（USDT，开新仓时必需）
 - **stop_loss**: 止损价格（开新仓时建议提供）
@@ -156,13 +165,13 @@ func (pb *PromptBuilder) getDecisionRequirementsZH() string {
 [
   {
     "symbol": "PIPPINUSDT",
-    "action": "PARTIAL_CLOSE",
+    "action": "close_long",
     "confidence": 85,
-    "reasoning": "当前PnL +2.96%，接近历史峰值+2.99%（回撤仅0.03%）。建议部分平仓锁定利润，因为：1) 持仓时间仅11分钟，已获得3%收益；2) 5分钟K线显示价格接近短期阻力位；3) 成交量开始萎缩，上涨动能减弱。建议平仓50%，剩余仓位设置跟踪止盈在峰值回撤20%处。"
+    "reasoning": "当前PnL +2.96%，接近历史峰值+2.99%（回撤仅0.03%）。建议平仓锁定利润，因为：1) 持仓时间仅11分钟，已获得3%收益；2) 5分钟K线显示价格接近短期阻力位；3) 成交量开始萎缩，上涨动能减弱。"
   },
   {
     "symbol": "HUSDT",
-    "action": "OPEN_NEW",
+    "action": "open_long",
     "leverage": 3,
     "position_size_usd": 500,
     "stop_loss": 0.1560,
@@ -202,8 +211,16 @@ func (pb *PromptBuilder) buildSystemPromptEN() string {
 ### Trend Following
 - Only enter when trends align across multiple timeframes
 - Use Open Interest (OI) changes to validate capital flow authenticity
-- OI up + Price up = Strong bullish trend
-- OI down + Price up = Shorts covering (potential reversal)
+- OI up + Price up = Strong bullish trend, consider open_long
+- OI up + Price down = Strong bearish trend, consider open_short
+- OI down + Price up = Shorts covering (potential reversal, be cautious going long)
+
+### Short-Selling Principles
+- Use LOWER leverage for shorts (shorts have unlimited upside risk)
+- Set TIGHTER stop-loss for shorts (2-3% vs 3-5% for longs)
+- Funding Rate > +0.01%: crowded longs, short signal
+- Funding Rate < -0.01%: crowded shorts, avoid shorting
+- Watch for short squeeze: OI rapidly decreasing + price sharply rising = exit short immediately
 
 ### Scale Operations
 - Scale-in: First entry max 50% of target position
@@ -218,7 +235,7 @@ func (pb *PromptBuilder) buildSystemPromptEN() string {
 [
   {
     "symbol": "BTCUSDT",
-    "action": "HOLD|PARTIAL_CLOSE|FULL_CLOSE|ADD_POSITION|OPEN_NEW|WAIT",
+    "action": "open_long|open_short|close_long|close_short|hold|wait",
     "leverage": 3,
     "position_size_usd": 1000,
     "stop_loss": 42000,
@@ -233,12 +250,12 @@ func (pb *PromptBuilder) buildSystemPromptEN() string {
 
 - **symbol**: Trading pair (required)
 - **action**: Action type (required)
-  - HOLD: Hold current position
-  - PARTIAL_CLOSE: Partially close position
-  - FULL_CLOSE: Fully close position
-  - ADD_POSITION: Add to existing position
-  - OPEN_NEW: Open new position
-  - WAIT: Wait, take no action
+  - open_long: Open long position (做多)
+  - open_short: Open short position (做空)
+  - close_long: Close long position (平多仓)
+  - close_short: Close short position (平空仓)
+  - hold: Hold current position
+  - wait: Wait, take no action
 - **leverage**: Leverage multiplier (required for new positions)
 - **position_size_usd**: Position size in USDT (required for new positions)
 - **stop_loss**: Stop-loss price (recommended for new positions)
@@ -291,13 +308,13 @@ func (pb *PromptBuilder) getDecisionRequirementsEN() string {
 [
   {
     "symbol": "PIPPINUSDT",
-    "action": "PARTIAL_CLOSE",
+    "action": "close_long",
     "confidence": 85,
-    "reasoning": "Current PnL +2.96%, near historical peak +2.99% (only 0.03% pullback). Suggest partial close to lock profits because: 1) Only 11 minutes holding time with 3% gain; 2) 5M chart shows price approaching short-term resistance; 3) Volume declining, upward momentum weakening. Recommend closing 50%, set trailing stop at 20% pullback from peak for remainder."
+    "reasoning": "Current PnL +2.96%, near historical peak +2.99% (only 0.03% pullback). Suggest closing to lock profits because: 1) Only 11 minutes holding time with 3% gain; 2) 5M chart shows price approaching short-term resistance; 3) Volume declining, upward momentum weakening."
   },
   {
     "symbol": "HUSDT",
-    "action": "OPEN_NEW",
+    "action": "open_long",
     "leverage": 3,
     "position_size_usd": 500,
     "stop_loss": 0.1560,
@@ -317,7 +334,7 @@ func (pb *PromptBuilder) getDecisionRequirementsEN() string {
 func FormatDecisionExample(lang Language) string {
 	example := Decision{
 		Symbol:          "BTCUSDT",
-		Action:          "OPEN_NEW",
+		Action:          "open_long",
 		Leverage:        3,
 		PositionSizeUSD: 1000,
 		StopLoss:        42000,
@@ -331,6 +348,7 @@ func FormatDecisionExample(lang Language) string {
 }
 
 // ValidateDecisionFormat 验证决策格式是否正确
+// 使用统一的 action 枚举: open_long, open_short, close_long, close_short, hold, wait
 func ValidateDecisionFormat(decisions []Decision) error {
 	if len(decisions) == 0 {
 		return fmt.Errorf("决策列表不能为空")
@@ -348,26 +366,26 @@ func ValidateDecisionFormat(decisions []Decision) error {
 			return fmt.Errorf("决策#%d: reasoning不能为空", i+1)
 		}
 
-		// 动作类型检查
+		// 动作类型检查（统一使用新枚举）
 		validActions := map[string]bool{
-			"HOLD":          true,
-			"PARTIAL_CLOSE": true,
-			"FULL_CLOSE":    true,
-			"ADD_POSITION":  true,
-			"OPEN_NEW":      true,
-			"WAIT":          true,
+			"open_long":   true,
+			"open_short":  true,
+			"close_long":  true,
+			"close_short": true,
+			"hold":        true,
+			"wait":        true,
 		}
 		if !validActions[d.Action] {
-			return fmt.Errorf("决策#%d: 无效的action类型: %s", i+1, d.Action)
+			return fmt.Errorf("决策#%d: 无效的action类型: %s (有效值: open_long, open_short, close_long, close_short, hold, wait)", i+1, d.Action)
 		}
 
 		// 开新仓位的必需参数检查
-		if d.Action == "OPEN_NEW" {
+		if d.Action == "open_long" || d.Action == "open_short" {
 			if d.Leverage == 0 {
-				return fmt.Errorf("决策#%d: OPEN_NEW动作需要提供leverage", i+1)
+				return fmt.Errorf("决策#%d: %s动作需要提供leverage", i+1, d.Action)
 			}
 			if d.PositionSizeUSD == 0 {
-				return fmt.Errorf("决策#%d: OPEN_NEW动作需要提供position_size_usd", i+1)
+				return fmt.Errorf("决策#%d: %s动作需要提供position_size_usd", i+1, d.Action)
 			}
 		}
 	}

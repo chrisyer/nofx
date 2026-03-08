@@ -370,11 +370,17 @@ func (e *DebateEngine) buildMarketContext(session *store.DebateSessionWithDetail
 }
 
 // buildDebateSystemPrompt enhances the base strategy prompt with debate-specific instructions
+// Base prompt comes first so AI processes core trading rules before debate-specific instructions
 func (e *DebateEngine) buildDebateSystemPrompt(basePrompt string, participant *store.DebateParticipant, round, maxRounds int) string {
 	personality := getPersonalityDescription(participant.Personality)
 	emoji := store.PersonalityEmojis[participant.Personality]
 
+	// Debate-specific additions (appended after base prompt to avoid overriding core rules)
+	// Action enums and output format are already defined in basePrompt, so we only add debate-unique elements
 	debateInstructions := fmt.Sprintf(`
+
+---
+
 ## DEBATE MODE - ROUND %d/%d
 
 You are participating in a multi-AI market debate as %s %s.
@@ -390,47 +396,15 @@ You are participating in a multi-AI market debate as %s %s.
 5. Your personality should influence your analysis bias but not override data
 6. You can recommend multiple coins with different actions
 
-### CRITICAL: Output Format (MUST follow exactly)
-
-First write your analysis:
-<reasoning>
-- Your market analysis for each coin with specific data references
-- Your main trading thesis and arguments
-- Response to other participants (if round > 1)
-</reasoning>
-
-Then output your decisions in STRICT JSON ARRAY format (can include multiple coins):
-<decision>
-[
-  {"symbol": "BTCUSDT", "action": "open_long", "confidence": 75, "leverage": 5, "position_pct": 0.3, "stop_loss": 0.02, "take_profit": 0.04, "reasoning": "BTC showing strength"},
-  {"symbol": "ETHUSDT", "action": "open_short", "confidence": 80, "leverage": 3, "position_pct": 0.2, "stop_loss": 0.03, "take_profit": 0.06, "reasoning": "ETH bearish divergence"},
-  {"symbol": "SOLUSDT", "action": "wait", "confidence": 60, "reasoning": "SOL needs more confirmation"}
-]
-</decision>
-
-### IMPORTANT: action field MUST be exactly one of:
-- "open_long" (做多/买入)
-- "open_short" (做空/卖出)
-- "close_long" (平多仓)
-- "close_short" (平空仓)
-- "hold" (持仓观望)
-- "wait" (空仓等待)
-
-### Field Requirements for each coin:
-- symbol: REQUIRED, the trading pair
-- action: REQUIRED, exactly one of the above values
-- confidence: REQUIRED, integer 0-100
-- leverage: REQUIRED for open_long/open_short, integer 1-20
-- position_pct: REQUIRED for open_long/open_short, float 0.1-1.0
-- stop_loss: REQUIRED for open_long/open_short, float 0.01-0.10 (percentage as decimal)
-- take_profit: REQUIRED for open_long/open_short, float 0.02-0.20 (percentage as decimal)
-- reasoning: REQUIRED, one sentence summary
-
----
+### Debate-Specific Output Fields (in addition to standard fields):
+- position_pct: REQUIRED for open_long/open_short, float 0.1-1.0 (position size as fraction)
+- stop_loss: as decimal percentage (e.g. 0.02 = 2%%)
+- take_profit: as decimal percentage (e.g. 0.04 = 4%%)
 
 `, round, maxRounds, emoji, participant.Personality, personality)
 
-	return debateInstructions + basePrompt
+	// Base prompt first, then debate-specific additions
+	return basePrompt + debateInstructions
 }
 
 // buildDebateUserPrompt adds debate context to the user prompt
