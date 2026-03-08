@@ -89,12 +89,12 @@ func (pt *PaperTrader) GetBalance() (map[string]interface{}, error) {
 	}
 
 	result := map[string]interface{}{
-		"total_equity":      pt.balance + unrealizedPnL,
-		"available_balance": pt.balance,
-		"wallet_balance":    pt.balance,
-		"unrealized_profit": unrealizedPnL,
-		"margin_used":       0.0, // Simplified for now
-		"is_paper":          true,
+		"totalEquity":           pt.balance + unrealizedPnL,
+		"availableBalance":      pt.balance,
+		"totalWalletBalance":    pt.balance,
+		"totalUnrealizedProfit": unrealizedPnL,
+		"marginUsed":            0.0, // Simplified for now
+		"isPaper":               true,
 	}
 	return result, nil
 }
