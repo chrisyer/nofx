@@ -20,6 +20,7 @@ import (
 	"nofx/trader/kucoin"
 	"nofx/trader/lighter"
 	"nofx/trader/okx"
+	"nofx/trader/paper"
 	"strings"
 	"sync"
 	"time"
@@ -111,6 +112,9 @@ type AutoTraderConfig struct {
 
 	// Competition visibility
 	ShowInCompetition bool // Whether to show in competition page
+	
+	// Simulation
+	PaperTrading bool // Whether to simulate trades
 
 	// Strategy configuration (use complete strategy config)
 	StrategyConfig *store.StrategyConfig // Strategy configuration (includes coin sources, indicators, risk control, prompts, etc.)
@@ -299,6 +303,12 @@ func NewAutoTrader(config AutoTraderConfig, st *store.Store, userID string) (*Au
 		trader = indodax.NewIndodaxTrader(config.IndodaxAPIKey, config.IndodaxSecretKey)
 	default:
 		return nil, fmt.Errorf("unsupported trading platform: %s", config.Exchange)
+	}
+
+	// Wrap in PaperTrader if simulation is enabled
+	if config.PaperTrading {
+		logger.Infof("🎮 [%s] Paper Trading mode ENABLED: using real market data but mock execution", config.Name)
+		trader = paper.NewPaperTrader(trader, st, config.ExchangeID, config.ID, config.InitialBalance)
 	}
 
 	// Validate initial balance configuration, auto-fetch from exchange if 0

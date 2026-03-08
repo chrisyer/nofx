@@ -127,6 +127,7 @@ export interface Exchange {
   secretKey?: string
   passphrase?: string            // OKX specific
   testnet?: boolean
+  paper_trading?: boolean        // Simulated trading
   // Hyperliquid specific
   hyperliquidWalletAddr?: string
   // Aster specific
@@ -148,6 +149,7 @@ export interface CreateExchangeRequest {
   secret_key?: string
   passphrase?: string
   testnet?: boolean
+  paper_trading?: boolean
   hyperliquid_wallet_addr?: string
   aster_user?: string
   aster_signer?: string
@@ -197,6 +199,7 @@ export interface UpdateExchangeConfigRequest {
       secret_key: string
       passphrase?: string
       testnet?: boolean
+      paper_trading?: boolean
       // Hyperliquid 特定字段
       hyperliquid_wallet_addr?: string
       // Aster 特定字段

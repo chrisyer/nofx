@@ -51,7 +51,8 @@ interface ExchangeConfigModalProps {
     lighterWalletAddr?: string,
     lighterPrivateKey?: string,
     lighterApiKeyPrivateKey?: string,
-    lighterApiKeyIndex?: number
+    lighterApiKeyIndex?: number,
+    paperTrading?: boolean
   ) => Promise<void>
   onDelete: (exchangeId: string) => void
   onClose: () => void
@@ -158,6 +159,7 @@ export function ExchangeConfigModal({
   const [secretKey, setSecretKey] = useState('')
   const [passphrase, setPassphrase] = useState('')
   const [testnet, setTestnet] = useState(false)
+  const [paperTrading, setPaperTrading] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
   const [serverIP, setServerIP] = useState<{ public_ip: string; message: string } | null>(null)
   const [loadingIP, setLoadingIP] = useState(false)
@@ -208,7 +210,6 @@ export function ExchangeConfigModal({
     indodax: { url: 'https://indodax.com/ref/Saep23/1', hasReferral: true },
   }
 
-  // Initialize form when editing
   useEffect(() => {
     if (editingExchangeId && selectedExchange) {
       setAccountName(selectedExchange.account_name || '')
@@ -216,6 +217,7 @@ export function ExchangeConfigModal({
       setSecretKey(selectedExchange.secretKey || '')
       setPassphrase('')
       setTestnet(selectedExchange.testnet || false)
+      setPaperTrading(selectedExchange.paper_trading || false)
       setAsterUser(selectedExchange.asterUser || '')
       setAsterSigner(selectedExchange.asterSigner || '')
       setAsterPrivateKey('')
@@ -316,22 +318,22 @@ export function ExchangeConfigModal({
     try {
       if (currentExchangeType === 'binance' || currentExchangeType === 'bybit' || currentExchangeType === 'indodax') {
         if (!apiKey.trim() || !secretKey.trim()) return
-        await onSave(exchangeId, exchangeType, trimmedAccountName, apiKey.trim(), secretKey.trim(), '', testnet)
-      } else if (currentExchangeType === 'okx' || currentExchangeType === 'bitget' || currentExchangeType === 'kucoin') {
+        await onSave(exchangeId, exchangeType, trimmedAccountName, apiKey.trim(), secretKey.trim(), '', testnet, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, paperTrading)
+      } else if (currentExchangeType === 'okx' || currentExchangeType === 'bitget' || currentExchangeType === 'kucoin' || currentExchangeType === 'gate') {
         if (!apiKey.trim() || !secretKey.trim() || !passphrase.trim()) return
-        await onSave(exchangeId, exchangeType, trimmedAccountName, apiKey.trim(), secretKey.trim(), passphrase.trim(), testnet)
+        await onSave(exchangeId, exchangeType, trimmedAccountName, apiKey.trim(), secretKey.trim(), passphrase.trim(), testnet, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, paperTrading)
       } else if (currentExchangeType === 'hyperliquid') {
         if (!apiKey.trim() || !hyperliquidWalletAddr.trim()) return
-        await onSave(exchangeId, exchangeType, trimmedAccountName, apiKey.trim(), '', '', testnet, hyperliquidWalletAddr.trim())
+        await onSave(exchangeId, exchangeType, trimmedAccountName, apiKey.trim(), '', '', testnet, hyperliquidWalletAddr.trim(), undefined, undefined, undefined, undefined, undefined, undefined, undefined, paperTrading)
       } else if (currentExchangeType === 'aster') {
         if (!asterUser.trim() || !asterSigner.trim() || !asterPrivateKey.trim()) return
-        await onSave(exchangeId, exchangeType, trimmedAccountName, '', '', '', testnet, undefined, asterUser.trim(), asterSigner.trim(), asterPrivateKey.trim())
+        await onSave(exchangeId, exchangeType, trimmedAccountName, '', '', '', testnet, undefined, asterUser.trim(), asterSigner.trim(), asterPrivateKey.trim(), undefined, undefined, undefined, undefined, paperTrading)
       } else if (currentExchangeType === 'lighter') {
         if (!lighterWalletAddr.trim() || !lighterApiKeyPrivateKey.trim()) return
-        await onSave(exchangeId, exchangeType, trimmedAccountName, '', '', '', testnet, undefined, undefined, undefined, undefined, lighterWalletAddr.trim(), '', lighterApiKeyPrivateKey.trim(), lighterApiKeyIndex)
+        await onSave(exchangeId, exchangeType, trimmedAccountName, '', '', '', testnet, undefined, undefined, undefined, undefined, lighterWalletAddr.trim(), '', lighterApiKeyPrivateKey.trim(), lighterApiKeyIndex, paperTrading)
       } else {
         if (!apiKey.trim() || !secretKey.trim()) return
-        await onSave(exchangeId, exchangeType, trimmedAccountName, apiKey.trim(), secretKey.trim(), '', testnet)
+        await onSave(exchangeId, exchangeType, trimmedAccountName, apiKey.trim(), secretKey.trim(), '', testnet, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, paperTrading)
       }
     } finally {
       setIsSaving(false)
@@ -615,6 +617,15 @@ export function ExchangeConfigModal({
                       ) : null}
                     </div>
                   )}
+
+                  {/* Paper Trading Toggle for CEX Options */}
+                  <div className="flex items-center gap-3 px-1 mt-4">
+                    <input type="checkbox" id="cex-papertrading" checked={paperTrading} onChange={(e) => setPaperTrading(e.target.checked)} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: '#0ECB81' }} />
+                    <label htmlFor="cex-papertrading" className="cursor-pointer">
+                      <span className="text-sm font-semibold" style={{ color: '#EAECEF' }}>{language === 'zh' ? '模拟盘 (Paper Trading)' : 'Paper Trading Mode'}</span>
+                      <span className="text-xs ml-2 block" style={{ color: '#848E9C' }}>{language === 'zh' ? '开启后不真实下单，使用虚拟机资产和主网数据交易。' : 'AI will trade using virtual money instead of making API calls.'}</span>
+                    </label>
+                  </div>
                 </>
               )}
 
