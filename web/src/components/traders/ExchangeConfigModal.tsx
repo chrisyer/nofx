@@ -685,6 +685,13 @@ export function ExchangeConfigModal({
                     <label className="text-sm font-semibold" style={{ color: '#EAECEF' }}>{t('hyperliquidMainWalletAddress', language)}</label>
                     <input type="text" value={hyperliquidWalletAddr} onChange={(e) => setHyperliquidWalletAddr(e.target.value)} placeholder={t('enterHyperliquidMainWalletAddress', language)} className="w-full px-4 py-3 rounded-xl" style={{ background: '#0B0E11', border: '1px solid #2B3139', color: '#EAECEF' }} required />
                   </div>
+                  <div className="flex items-center gap-3 px-1">
+                    <input type="checkbox" id="hyperliquid-testnet" checked={testnet} onChange={(e) => setTestnet(e.target.checked)} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: '#7FE7CC' }} />
+                    <label htmlFor="hyperliquid-testnet" className="cursor-pointer">
+                      <span className="text-sm font-semibold" style={{ color: '#EAECEF' }}>Testnet</span>
+                      <span className="text-xs ml-2" style={{ color: '#848E9C' }}>{t('testnetDescription', language)}</span>
+                    </label>
+                  </div>
                 </>
               )}
 
