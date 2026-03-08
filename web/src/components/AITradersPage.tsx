@@ -717,7 +717,8 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
     lighterWalletAddr?: string,
     lighterPrivateKey?: string,
     lighterApiKeyPrivateKey?: string,
-    lighterApiKeyIndex?: number
+    lighterApiKeyIndex?: number,
+    paperTrading?: boolean
   ) => {
     try {
       if (exchangeId) {
@@ -744,6 +745,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
               lighter_private_key: lighterPrivateKey || '',
               lighter_api_key_private_key: lighterApiKeyPrivateKey || '',
               lighter_api_key_index: lighterApiKeyIndex || 0,
+              paper_trading: paperTrading || false,
             },
           },
         }
@@ -771,6 +773,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
           lighter_private_key: lighterPrivateKey || '',
           lighter_api_key_private_key: lighterApiKeyPrivateKey || '',
           lighter_api_key_index: lighterApiKeyIndex || 0,
+          paper_trading: paperTrading || false,
         }
 
         await toast.promise(api.createExchangeEncrypted(createRequest), {
