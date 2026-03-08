@@ -311,6 +311,12 @@ func NewAutoTrader(config AutoTraderConfig, st *store.Store, userID string) (*Au
 		trader = paper.NewPaperTrader(trader, st, config.ExchangeID, config.ID, config.InitialBalance)
 	}
 
+	// Hard-set simulation fallback for paper trading if still missing
+	if config.PaperTrading && config.InitialBalance <= 0 {
+		config.InitialBalance = 1000.0
+		logger.Infof("🎮 [%s] Initial balance not set in config, defaulting to %.2f USDT for Paper Trading.", config.Name, config.InitialBalance)
+	}
+
 	// Validate initial balance configuration, auto-fetch from exchange if 0
 	if config.InitialBalance <= 0 {
 		logger.Infof("📊 [%s] Initial balance not set, attempting to fetch current balance from exchange...", config.Name)
