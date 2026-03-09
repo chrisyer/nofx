@@ -482,6 +482,48 @@ func (at *AutoTrader) Run() error {
 		}
 	}
 
+	// Start PaperTrader price monitor if using paper trading
+	if paperTrader, ok := at.trader.(*paper.PaperTrader); ok {
+		// Register SL/TP trigger callback to log events
+		traderName := at.name
+		traderStore := at.store
+		traderID := at.id
+		paperTrader.SetOnStopTriggered(func(symbol, side, reason string, closePrice, pnl, quantity float64) {
+			emoji := "🛑"
+			if reason == "take_profit" {
+				emoji = "🎯"
+			}
+			logger.Infof("%s [%s] Paper %s triggered: %s %s | Price=%.4f | PnL=%.4f | Qty=%.4f",
+				emoji, traderName, reason, symbol, side, closePrice, pnl, quantity)
+
+			// Record as a decision for audit trail
+			if traderStore != nil {
+				record := &store.DecisionRecord{
+					TraderID: traderID,
+					ExecutionLog: []string{
+						fmt.Sprintf("Paper trading %s auto-triggered: %s %s at %.4f, PnL=%.4f", reason, symbol, side, closePrice, pnl),
+					},
+					Success: true,
+					Decisions: []store.DecisionAction{{
+						Action:    fmt.Sprintf("auto_%s", reason),
+						Symbol:    symbol,
+						Quantity:  quantity,
+						Price:     closePrice,
+						Reasoning: fmt.Sprintf("Paper trading %s auto-triggered by price monitor", reason),
+						Timestamp: time.Now().UTC(),
+						Success:   true,
+					}},
+				}
+				if err := traderStore.Decision().LogDecision(record); err != nil {
+					logger.Infof("⚠️ Failed to save paper SL/TP decision: %v", err)
+				}
+			}
+		})
+
+		paperTrader.StartPriceMonitor()
+		logger.Infof("🎮 [%s] Paper trading price monitor started (checking SL/TP every 5s)", at.name)
+	}
+
 	ticker := time.NewTicker(at.config.ScanInterval)
 	defer ticker.Stop()
 
@@ -544,6 +586,11 @@ func (at *AutoTrader) Stop() {
 	}
 	at.isRunning = false
 	at.isRunningMutex.Unlock()
+
+	// Stop PaperTrader price monitor if applicable
+	if paperTrader, ok := at.trader.(*paper.PaperTrader); ok {
+		paperTrader.StopPriceMonitor()
+	}
 
 	close(at.stopMonitorCh) // Notify monitoring goroutine to stop
 	at.monitorWg.Wait()     // Wait for monitoring goroutine to finish
@@ -948,6 +995,11 @@ func (at *AutoTrader) buildTradingContext() (*kernel.Context, error) {
 		},
 		Positions:      positionInfos,
 		CandidateCoins: candidateCoins,
+	}
+
+	// Set paper trading flag
+	if _, ok := at.trader.(*paper.PaperTrader); ok {
+		ctx.IsPaperTrading = true
 	}
 
 	// 7. Add recent closed trades (if store is available)
@@ -2006,6 +2058,11 @@ func (at *AutoTrader) recordAndConfirmOrder(orderResult map[string]interface{}, 
 
 	// Exchanges with OrderSync: Skip immediate order recording, let OrderSync handle it
 	// This ensures accurate data from GetTrades API and avoids duplicate records
+	// Paper trading also skips - positions are managed internally by PaperTrader
+	if _, isPaper := at.trader.(*paper.PaperTrader); isPaper {
+		logger.Infof("  📝 Paper trading order (id: %s), position managed by PaperTrader", orderID)
+		return
+	}
 	switch at.exchange {
 	case "binance", "lighter", "hyperliquid", "bybit", "okx", "bitget", "aster", "kucoin", "gate":
 		logger.Infof("  📝 Order submitted (id: %s), will be synced by OrderSync", orderID)

@@ -117,6 +117,7 @@ type Context struct {
 	PromptVariant   string                             `json:"prompt_variant,omitempty"`
 	TradingStats    *TradingStats                      `json:"trading_stats,omitempty"`
 	RecentOrders    []RecentOrder                      `json:"recent_orders,omitempty"`
+	IsPaperTrading  bool                               `json:"is_paper_trading,omitempty"` // Paper trading mode flag
 	MarketDataMap   map[string]*market.Data            `json:"-"`
 	MultiTFMarket   map[string]map[string]*market.Data `json:"-"`
 	OITopDataMap    map[string]*OITopData              `json:"-"`
@@ -1291,6 +1292,9 @@ func (e *StrategyEngine) BuildUserPrompt(ctx *Context) string {
 	sb.WriteString("\n---\n\n")
 
 	// System status
+	if ctx.IsPaperTrading {
+		sb.WriteString("⚠️ **PAPER TRADING MODE** — This is a simulation with virtual funds. You can be more experimental with strategies and position sizes. No real money is at risk.\n\n")
+	}
 	sb.WriteString(fmt.Sprintf("Time: %s | Period: #%d | Runtime: %d minutes\n\n",
 		ctx.CurrentTime, ctx.CallCount, ctx.RuntimeMinutes))
 

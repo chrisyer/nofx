@@ -1093,10 +1093,28 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
                     </div>
                     <div className="min-w-0">
                       <div
-                        className="font-bold text-base md:text-lg truncate"
+                        className="font-bold text-base md:text-lg truncate flex items-center gap-2"
                         style={{ color: '#EAECEF' }}
                       >
                         {trader.trader_name}
+                        {(() => {
+                          const exchange = allExchanges.find(e => e.id === trader.exchange_id)
+                          if (exchange?.paper_trading) {
+                            return (
+                              <span
+                                className="text-[10px] font-mono px-1.5 py-0.5 rounded-full uppercase tracking-wider"
+                                style={{
+                                  background: 'rgba(139, 92, 246, 0.15)',
+                                  color: '#A78BFA',
+                                  border: '1px solid rgba(139, 92, 246, 0.3)',
+                                }}
+                              >
+                                🎮 PAPER
+                              </span>
+                            )
+                          }
+                          return null
+                        })()}
                       </div>
                       <div
                         className="text-xs md:text-sm truncate"
