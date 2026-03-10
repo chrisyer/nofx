@@ -830,4 +830,22 @@ func (pt *PaperTrader) restoreFromDB() {
 	if restoredCount > 0 {
 		logger.Infof("[PaperTrader] ♻️ Restored %d positions from database", restoredCount)
 	}
+
+	// Recalculate paper balance based on historical closed positions
+	var stats struct {
+		TotalPnL float64
+		TotalFee float64
+	}
+	err = pt.store.GormDB().Model(&store.TraderPosition{}).
+		Select("COALESCE(SUM(realized_pnl), 0) as total_pn_l, COALESCE(SUM(fee), 0) as total_fee").
+		Where("trader_id = ? AND source = 'paper_trading' AND status = 'CLOSED'", pt.traderID).
+		Scan(&stats).Error
+
+	if err == nil {
+		pt.balance += stats.TotalPnL - stats.TotalFee
+		logger.Infof("[PaperTrader] 💰 Restored paper balance: %.2f (Initial: %.2f, PnL: %.2f, Fee: %.2f)",
+			pt.balance, pt.initialBalance, stats.TotalPnL, stats.TotalFee)
+	} else {
+		logger.Infof("[PaperTrader] ⚠️ Failed to restore paper balance from DB: %v", err)
+	}
 }
