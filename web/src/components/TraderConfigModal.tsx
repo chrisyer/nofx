@@ -33,6 +33,7 @@ interface FormState {
   strategy_id: string
   is_cross_margin: boolean
   show_in_competition: boolean
+  reverse_position: boolean
   scan_interval_minutes: number
   initial_balance?: number
 }
@@ -64,6 +65,7 @@ export function TraderConfigModal({
     strategy_id: '',
     is_cross_margin: true,
     show_in_competition: true,
+    reverse_position: false,
     scan_interval_minutes: 3,
   })
   const [isSaving, setIsSaving] = useState(false)
@@ -112,6 +114,7 @@ export function TraderConfigModal({
         strategy_id: '',
         is_cross_margin: true,
         show_in_competition: true,
+        reverse_position: false,
         scan_interval_minutes: 3,
       })
     }
@@ -166,6 +169,7 @@ export function TraderConfigModal({
         strategy_id: formData.strategy_id,
         is_cross_margin: formData.is_cross_margin,
         show_in_competition: formData.show_in_competition,
+        reverse_position: formData.reverse_position,
         scan_interval_minutes: formData.scan_interval_minutes,
       }
 
@@ -474,6 +478,40 @@ export function TraderConfigModal({
                 </div>
                   <p className="text-xs text-[#848E9C] mt-1">
                     {t('hiddenInCompetition', language)}
+                </p>
+              </div>
+
+              {/* Reverse Position */}
+              <div>
+                <label className="text-sm text-[#EAECEF] block mb-2">
+                  {t('reversePosition', language)}
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleInputChange('reverse_position', false)}
+                    className={`flex-1 px-3 py-2 rounded text-sm ${
+                      !formData.reverse_position
+                        ? 'bg-[#F0B90B] text-black'
+                        : 'bg-[#0B0E11] text-[#848E9C] border border-[#2B3139]'
+                    }`}
+                  >
+                    {t('reversePositionOff', language)}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleInputChange('reverse_position', true)}
+                    className={`flex-1 px-3 py-2 rounded text-sm ${
+                      formData.reverse_position
+                        ? 'bg-[#F0B90B] text-black'
+                        : 'bg-[#0B0E11] text-[#848E9C] border border-[#2B3139]'
+                    }`}
+                  >
+                    {t('reversePositionOn', language)}
+                  </button>
+                </div>
+                <p className="text-xs text-[#848E9C] mt-1">
+                  {t('reversePositionHint', language)}
                 </p>
               </div>
 
