@@ -112,6 +112,10 @@ type AutoTraderConfig struct {
 
 	// Competition visibility
 	ShowInCompetition bool // Whether to show in competition page
+
+	// Reverse position mode: when enabled, LONG decisions execute as SHORT and vice versa
+	// Stop loss and take profit prices are also swapped accordingly
+	ReversePosition bool
 	
 	// Simulation
 	PaperTrading bool // Whether to simulate trades
@@ -1114,8 +1118,36 @@ func (at *AutoTrader) buildTradingContext() (*kernel.Context, error) {
 	return ctx, nil
 }
 
+// reverseDecision reverses a trading decision: LONG<->SHORT, and swaps SL/TP prices
+func reverseDecision(decision *kernel.Decision) *kernel.Decision {
+	reversed := *decision // shallow copy
+	switch decision.Action {
+	case "open_long":
+		reversed.Action = "open_short"
+		reversed.StopLoss, reversed.TakeProfit = decision.TakeProfit, decision.StopLoss
+	case "open_short":
+		reversed.Action = "open_long"
+		reversed.StopLoss, reversed.TakeProfit = decision.TakeProfit, decision.StopLoss
+	case "close_long":
+		reversed.Action = "close_short"
+	case "close_short":
+		reversed.Action = "close_long"
+	}
+	return &reversed
+}
+
 // executeDecisionWithRecord executes AI decision and records detailed information
 func (at *AutoTrader) executeDecisionWithRecord(decision *kernel.Decision, actionRecord *store.DecisionAction) error {
+	// Apply reverse position mode if enabled
+	if at.config.ReversePosition {
+		original := decision.Action
+		decision = reverseDecision(decision)
+		if original != decision.Action {
+			logger.Infof("  🔄 [ReversePosition] %s → %s (SL=%.2f, TP=%.2f)", original, decision.Action, decision.StopLoss, decision.TakeProfit)
+		}
+		actionRecord.Action = decision.Action
+	}
+
 	switch decision.Action {
 	case "open_long":
 		return at.executeOpenLongWithRecord(decision, actionRecord)

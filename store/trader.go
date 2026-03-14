@@ -30,6 +30,7 @@ type Trader struct {
 	IsRunning           bool      `gorm:"column:is_running;default:false" json:"is_running"`
 	IsCrossMargin       bool      `gorm:"column:is_cross_margin;default:true" json:"is_cross_margin"`
 	ShowInCompetition   bool      `gorm:"column:show_in_competition;default:true" json:"show_in_competition"`
+	ReversePosition     bool      `gorm:"column:reverse_position;default:false" json:"reverse_position"`
 	CreatedAt           time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
 	UpdatedAt           time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
 
@@ -110,12 +111,13 @@ func (s *TraderStore) Update(trader *Trader) error {
 		trader.ID, trader.Name, trader.AIModelID, trader.StrategyID)
 
 	updates := map[string]interface{}{
-		"name":           trader.Name,
-		"ai_model_id":    trader.AIModelID,
-		"exchange_id":    trader.ExchangeID,
-		"strategy_id":    trader.StrategyID,
-		"is_cross_margin": trader.IsCrossMargin,
+		"name":                trader.Name,
+		"ai_model_id":         trader.AIModelID,
+		"exchange_id":         trader.ExchangeID,
+		"strategy_id":         trader.StrategyID,
+		"is_cross_margin":     trader.IsCrossMargin,
 		"show_in_competition": trader.ShowInCompetition,
+		"reverse_position":    trader.ReversePosition,
 	}
 
 	// Only update these if > 0

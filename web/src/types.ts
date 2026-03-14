@@ -169,6 +169,7 @@ export interface CreateTraderRequest {
   scan_interval_minutes?: number
   is_cross_margin?: boolean
   show_in_competition?: boolean // 是否在竞技场显示
+  reverse_position?: boolean // 是否开启反向仓位
   // 以下字段为向后兼容保留，新版使用策略配置
   btc_eth_leverage?: number
   altcoin_leverage?: number
@@ -244,6 +245,7 @@ export interface TraderConfigData {
   strategy_name?: string  // 策略名称
   is_cross_margin: boolean
   show_in_competition: boolean  // 是否在竞技场显示
+  reverse_position: boolean  // 是否开启反向仓位
   scan_interval_minutes: number
   initial_balance: number
   is_running: boolean
