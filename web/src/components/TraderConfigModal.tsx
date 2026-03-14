@@ -105,6 +105,7 @@ export function TraderConfigModal({
       setFormData({
         ...traderData,
         strategy_id: traderData.strategy_id || '',
+        reverse_position: traderData.reverse_position ?? false,
       })
     } else if (!isEditMode) {
       setFormData({
